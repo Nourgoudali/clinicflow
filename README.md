@@ -390,4 +390,4 @@ docker-compose up --build
 
 ## 📜 Licence & Auteur
 
-Développé pour la clinique **ClinicFlow**. Tous droits réservés.
+Développé par NOUR GOUDALI. Tous droits réservés.
