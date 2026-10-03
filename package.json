@@ -1,0 +1,21 @@
+{
+  "name": "clinicflow-root",
+  "version": "1.0.0",
+  "description": "ClinicFlow — Full PERN Stack Patient & Appointment Management System",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd backend && npm run build --if-present && cd ../frontend && npm run build",
+    "db:migrate": "cd backend && npm run db:migrate",
+    "db:seed": "cd backend && npm run db:seed",
+    "test": "cd backend && npm test",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "author": "ClinicFlow Team",
+  "license": "MIT"
+}

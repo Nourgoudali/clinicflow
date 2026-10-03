@@ -1,0 +1,334 @@
+openapi: 3.0.0
+info:
+  title: ClinicFlow API
+  version: 1.0.0
+  description: Clinic Management API for Patients & Appointments (PERN Stack)
+servers:
+  - url: http://localhost:5000/api
+    description: Local Development Server
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@clinicflow.com
+        password:
+          type: string
+          example: Admin123!
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, staff]
+        createdAt:
+          type: string
+          format: date-time
+
+    LoginResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        token:
+          type: string
+
+    PatientInput:
+      type: object
+      required:
+        - fullName
+        - cin
+        - phone
+        - birthDate
+      properties:
+        fullName:
+          type: string
+          example: Fatima Zahra Alami
+        cin:
+          type: string
+          example: AB123456
+        phone:
+          type: string
+          pattern: '^[0-9]+$'
+          example: "0612345678"
+        birthDate:
+          type: string
+          format: date
+          example: "1990-05-15"
+        address:
+          type: string
+          example: "123 Avenue Mohammed V, Casablanca"
+
+    AppointmentInput:
+      type: object
+      required:
+        - patientId
+        - appointmentDate
+        - reason
+      properties:
+        patientId:
+          type: string
+          format: uuid
+        appointmentDate:
+          type: string
+          format: date-time
+          example: "2026-10-02T10:00:00Z"
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled]
+          default: pending
+        reason:
+          type: string
+          example: Consultation générale
+        notes:
+          type: string
+          example: Patient se plaint de maux de tête
+
+    AppointmentStatusUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, cancelled]
+
+    DashboardStats:
+      type: object
+      properties:
+        totalPatients:
+          type: integer
+          example: 120
+        todayAppointments:
+          type: integer
+          example: 8
+        pendingAppointments:
+          type: integer
+          example: 14
+        confirmedAppointments:
+          type: integer
+          example: 32
+
+paths:
+  /auth/login:
+    post:
+      summary: User login
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        200:
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        401:
+          description: Invalid credentials
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Authenticated user details
+        401:
+          description: Unauthorized
+
+  /patients:
+    get:
+      summary: List patients with pagination and search
+      tags: [Patients]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Search term matching full name or CIN
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        200:
+          description: List of patients with pagination metadata
+    post:
+      summary: Create new patient
+      tags: [Patients]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientInput'
+      responses:
+        201:
+          description: Patient created
+        409:
+          description: CIN already exists
+
+  /patients/{id}:
+    get:
+      summary: Get patient details by ID with their appointments
+      tags: [Patients]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Patient details
+        404:
+          description: Patient not found
+    put:
+      summary: Update patient details
+      tags: [Patients]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientInput'
+      responses:
+        200:
+          description: Patient updated
+    delete:
+      summary: Delete patient (Admin only)
+      tags: [Patients]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Patient deleted
+        403:
+          description: Forbidden (Admin role required)
+
+  /appointments:
+    get:
+      summary: List / filter appointments
+      tags: [Appointments]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: date
+          schema:
+            type: string
+            format: date
+          description: Filter by date (YYYY-MM-DD)
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, confirmed, cancelled]
+      responses:
+        200:
+          description: List of appointments
+    post:
+      summary: Create appointment (Validates 30-minute conflict rule)
+      tags: [Appointments]
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentInput'
+      responses:
+        201:
+          description: Appointment created
+        409:
+          description: Conflict (30-minute rule violation)
+
+  /appointments/{id}/status:
+    patch:
+      summary: Update appointment status (Enforces 30-minute rule on confirmation)
+      tags: [Appointments]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppointmentStatusUpdate'
+      responses:
+        200:
+          description: Appointment status updated
+        409:
+          description: Conflict (30-minute rule violation)
+
+  /dashboard/stats:
+    get:
+      summary: Get clinic KPI dashboard statistics
+      tags: [Dashboard]
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Dashboard stats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
